@@ -1,4 +1,4 @@
-module git.exness.io/sre/imperva-events
+module github.com/devopsext/imperva-events
 
 go 1.18
 
