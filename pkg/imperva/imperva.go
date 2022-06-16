@@ -3,8 +3,8 @@ package imperva
 import (
 	"encoding/json"
 	"fmt"
-	"git.exness.io/sre/imperva-events/pkg/common"
-	"git.exness.io/sre/imperva-events/pkg/output"
+	"github.com/devopsext/imperva-events/pkg/common"
+	"github.com/devopsext/imperva-events/pkg/output"
 	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"

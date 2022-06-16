@@ -1,6 +1,6 @@
 package main
 
-import "git.exness.io/sre/imperva-events/cmd"
+import "github.com/devopsext/imperva-events/cmd"
 
 func main() {
 	cmd.Execute()

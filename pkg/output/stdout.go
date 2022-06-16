@@ -1,7 +1,7 @@
 package output
 
 import (
-	"git.exness.io/sre/imperva-events/pkg/common"
+	"github.com/devopsext/imperva-events/pkg/common"
 	"github.com/rs/zerolog/log"
 )
 

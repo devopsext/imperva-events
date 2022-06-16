@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"git.exness.io/sre/imperva-events/pkg/common"
-	"git.exness.io/sre/imperva-events/pkg/imperva"
-	"git.exness.io/sre/imperva-events/pkg/output"
+	"github.com/devopsext/imperva-events/pkg/common"
+	"github.com/devopsext/imperva-events/pkg/imperva"
+	"github.com/devopsext/imperva-events/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
