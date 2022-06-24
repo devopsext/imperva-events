@@ -91,6 +91,8 @@ func init() {
 	pollInterval = common.EnvGet("IMPERVA_POLL_INTERVAL", pollInterval).(int)
 	initInterval = common.EnvGet("IMPERVA_INIT_INTERVAL", initInterval).(int)
 
+	isDebug = common.EnvGet("IMPERVA_DEBUG", isDebug).(bool)
+
 	flags := rootCmd.PersistentFlags()
 
 	flags.StringVar(&impervaID, "api-id", impervaID, "Imperva API ID")
