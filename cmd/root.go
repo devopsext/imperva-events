@@ -25,7 +25,7 @@ var (
 	grafanaURL    string
 	grafanaAPIKey string
 
-	pollInterval = 10
+	pollInterval = 30
 	initInterval = 600
 
 	wg sync.WaitGroup
@@ -44,11 +44,11 @@ var rootCmd = &cobra.Command{
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		}
 
-		if impervaID == "" || impervaToken == "" || impervaAccountID == "" {
-			log.Fatal().Msg("IMPERVA_API_ID, IMPERVA_API_TOKEN and IMPERVA_ACCOUNT_ID must be set")
+		if impervaID == "" || impervaToken == "" {
+			log.Fatal().Msg("IMPERVA_API_ID, IMPERVA_API_TOKEN must be set")
 		}
 
-		i, err := imperva.NewImperva(impervaID, impervaToken, impervaAccountID)
+		i, err := imperva.New(impervaID, impervaToken, impervaAccountID, initInterval)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to create Imperva client")
 		}
@@ -64,7 +64,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		wg.Add(1)
-		i.Run(pollInterval, initInterval, &wg)
+		i.Run(pollInterval, &wg)
 		wg.Wait()
 	},
 }
