@@ -54,13 +54,23 @@ var rootCmd = &cobra.Command{
 		}
 
 		if slackToken != "" && slackChannel != "" {
-			i.AddOutput(output.NewSlack(slackToken, slackChannel))
-			log.Info().Msg("Slack output enabled")
+			slackOutput, err := output.NewSlack(slackToken, slackChannel)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to create Slack output")
+			} else {
+				i.AddOutput(slackOutput)
+				log.Info().Msg("Slack output enabled")
+			}
 		}
 
 		if grafanaURL != "" && grafanaAPIKey != "" {
-			i.AddOutput(output.NewGrafana(grafanaURL, grafanaAPIKey))
-			log.Info().Msg("Grafana output enabled")
+			grafanaOutput, err := output.NewGrafana(grafanaURL, grafanaAPIKey)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to create Grafana output")
+			} else {
+				i.AddOutput(grafanaOutput)
+				log.Info().Msg("Grafana output enabled")
+			}
 		}
 
 		wg.Add(1)

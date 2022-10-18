@@ -19,14 +19,18 @@ func (s *Slack) Send(e *common.Event) ([]byte, error) {
 	})
 }
 
-func NewSlack(token string, channel string) *Slack {
-	return &Slack{
-		client: vendors.NewSlack(vendors.SlackOptions{
-			Timeout:  30,
-			Insecure: false,
-			Token:    token,
-			Channel:  channel,
-		}),
-		channel: channel,
+func NewSlack(token string, channel string) (*Slack, error) {
+	slack, err := vendors.NewSlack(vendors.SlackOptions{
+		Timeout:  30,
+		Insecure: false,
+		Token:    token,
+		Channel:  channel,
+	})
+	if err != nil {
+		return nil, err
 	}
+	return &Slack{
+		client:  slack,
+		channel: channel,
+	}, nil
 }

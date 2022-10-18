@@ -14,19 +14,22 @@ func (g *Grafana) Send(e *common.Event) ([]byte, error) {
 
 	t := e.Time.Format(time.RFC3339Nano)
 
-	return g.client.CreateCustomAnnotation(&vendors.GrafanaCreateAnnotationOptions{
+	return g.client.CreateAnnotation(vendors.GrafanaCreateAnnotationOptions{
 		Time:    t,
 		TimeEnd: t,
 		Tags:    "imperva",
 		Text:    e.Body,
 	})
+
 }
 
-func NewGrafana(url string, apiKey string) *Grafana {
-	return &Grafana{
-		client: vendors.NewGrafana(vendors.GrafanaOptions{
-			URL:    url,
-			APIKey: apiKey,
-		}),
+func NewGrafana(url string, apiKey string) (*Grafana, error) {
+	g, err := vendors.NewGrafana(vendors.GrafanaOptions{
+		URL:    url,
+		APIKey: apiKey,
+	})
+	if err != nil {
+		return nil, err
 	}
+	return &Grafana{client: g}, nil
 }
