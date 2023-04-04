@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/devopsext/imperva-events/pkg/common"
 	"github.com/devopsext/imperva-events/pkg/output"
+	"github.com/golang-module/carbon/v2"
 	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 const apiInfraEvents = "https://my.imperva.com/api/v1/infra/events"
 const apiAuditEvents = "https://api.imperva.com/audit-trail/v2/events"
+const apiBillingSummary = "https://api.imperva.com/usage-report/api/v1/billing-summary"
 
 // Traffic Statistics and Details API Get Infrastructure Protection Events
 //curl --location --request POST 'https://my.imperva.com/api/v1/infra/events' \
@@ -27,6 +29,12 @@ const apiAuditEvents = "https://api.imperva.com/audit-trail/v2/events"
 //  -H 'accept: application/json' \
 //  -H 'x-API-Id: YYY' \
 //  -H 'x-API-Key: XXX'
+
+// Billing Summary API
+//curl --location 'https://api.imperva.com/usage-report/api/v1/billing-summary?caid=1395104' \
+//--header 'x-API-Key: XXX' \
+//--header 'x-API-Id: YYY' \
+//--header 'Content-Type: application/json' \
 
 type InfraEvent struct {
 	EventTime     string `json:"eventTime"`
@@ -75,16 +83,42 @@ type AuditEventsResponse struct {
 	Elements []AuditEvent `json:"elements"`
 }
 
+type BillingService struct {
+	ServiceUsage float64 `json:"serviceUsage"`
+	Service      string  `json:"service"`
+	UsageType    string  `json:"usageType"`
+	ServiceName  string  `json:"serviceName"`
+}
+
+type BillingRecord struct {
+	BillingIssueDate  time.Time        `json:"billingIssueDate"`
+	StartDate         time.Time        `json:"startDate"`
+	EndDate           time.Time        `json:"endDate"`
+	PurchasedQuantity float64          `json:"purchasedQuantity"`
+	Plan              string           `json:"plan"`
+	PlanName          string           `json:"planName"`
+	Services          []BillingService `json:"services"`
+	PlanUsage         float64          `json:"planUsage"`
+	Overages          float64          `json:"overages"`
+	BillingStatus     string           `json:"billingStatus"`
+	DataUnit          string           `json:"dataUnit"`
+}
+
+type BillingSummaryResponse struct {
+	BillingRecords []BillingRecord `json:"billingRecords"`
+}
+
 type Imperva struct {
-	client         *http.Client
-	lastInfraEvent time.Time
-	lastAuditEvent time.Time
-	mutex          sync.RWMutex
-	ticker         *time.Ticker
-	id             string
-	token          string
-	accountId      string
-	outputs        []output.Output
+	client           *http.Client
+	lastInfraEvent   time.Time
+	lastAuditEvent   time.Time
+	lastBillingEvent carbon.Carbon
+	mutex            sync.RWMutex
+	ticker           *time.Ticker
+	id               string
+	token            string
+	accountId        string
+	outputs          []output.Output
 }
 
 func (ie *InfraEvent) GetTime() time.Time {
@@ -206,6 +240,40 @@ func (i *Imperva) getAuditEvents() ([]AuditEvent, error) {
 	return e, nil
 }
 
+func (i *Imperva) GetBillingSummary() (BillingSummaryResponse, error) {
+	var b BillingSummaryResponse
+	req, err := i.request(http.MethodGet, apiBillingSummary)
+	if err != nil {
+		return b, err
+	}
+
+	t := carbon.Now(carbon.UTC)
+	q := req.URL.Query()
+	q.Add("caid", i.accountId)
+	q.Add("start", t.StartOfMonth().ToRfc3339String())
+	q.Add("end", t.ToRfc3339String())
+	req.URL.RawQuery = q.Encode()
+	resp, err := i.client.Do(req)
+	if err != nil {
+		return b, err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close body")
+		}
+	}(resp.Body)
+	bb, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return b, err
+	}
+	err = json.Unmarshal(bb, &b)
+	if err != nil {
+		return b, err
+	}
+	return b, nil
+}
+
 func (i *Imperva) AddOutput(o output.Output) {
 	i.outputs = append(i.outputs, o)
 }
@@ -223,6 +291,18 @@ func (ie *InfraEvent) toEvent() *common.Event {
 		Time:  ie.GetTime(),
 		Title: "Infra",
 		Body:  ie.String(),
+	}
+}
+
+func (br *BillingRecord) String() string {
+	return fmt.Sprintf("Plan: %s\nUsage: %f (%f%%)\nOverages: %f", br.PlanName, br.PlanUsage, br.PlanUsage/br.PurchasedQuantity*100, br.Overages)
+}
+
+func (br *BillingRecord) toEvent() *common.Event {
+	return &common.Event{
+		Time:  br.BillingIssueDate,
+		Title: "Imperva Billing Outrage",
+		Body:  br.String(),
 	}
 }
 
@@ -259,6 +339,21 @@ func (i *Imperva) Run(pollInterval int, wg *sync.WaitGroup) {
 			for _, event := range aes {
 				i.Send(event.toEvent())
 			}
+
+			if i.lastBillingEvent.DiffInHours() > 1 {
+
+				bsr, err := i.GetBillingSummary()
+				if err != nil {
+					log.Error().Err(err).Msg("failed to get billing summary")
+				}
+
+				for _, br := range bsr.BillingRecords {
+					if br.BillingStatus == "OPEN" && br.PlanUsage/br.PurchasedQuantity > 0.9 {
+						i.Send(br.toEvent())
+						i.lastBillingEvent = carbon.Now()
+					}
+				}
+			}
 			wg.Done()
 		}
 	}()
@@ -291,12 +386,13 @@ func New(id string, token string, accountId string, initInterval int) (*Imperva,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		id:             id,
-		token:          token,
-		accountId:      accountId,
-		outputs:        append([]output.Output{}, output.NewStdout()),
-		lastInfraEvent: time.Now().Add(time.Duration(-initInterval) * time.Minute),
-		lastAuditEvent: time.Now().Add(time.Duration(-initInterval) * time.Minute),
+		id:               id,
+		token:            token,
+		accountId:        accountId,
+		outputs:          append([]output.Output{}, output.NewStdout()),
+		lastInfraEvent:   time.Now().Add(time.Duration(-initInterval) * time.Minute),
+		lastAuditEvent:   time.Now().Add(time.Duration(-initInterval) * time.Minute),
+		lastBillingEvent: carbon.Now().AddDays(-1),
 	}
 
 	return i, nil
