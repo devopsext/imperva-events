@@ -111,7 +111,7 @@ type BillingSummaryResponse struct {
 type Imperva struct {
 	client           *http.Client
 	lastInfraEvent   time.Time
-	lastAuditEvent   time.Time
+	lastAuditEvent   carbon.Carbon
 	lastBillingEvent carbon.Carbon
 	mutex            sync.RWMutex
 	ticker           *time.Ticker
@@ -199,7 +199,7 @@ func (i *Imperva) getAuditEvents() ([]AuditEvent, error) {
 		return e, err
 	}
 	q := req.URL.Query()
-	q.Add("start", fmt.Sprintf("%d", i.lastAuditEvent.Unix()))
+	q.Add("start", fmt.Sprintf("%d", i.lastAuditEvent.TimestampMilli()))
 	req.URL.RawQuery = q.Encode()
 	resp, err := i.client.Do(req)
 	if err != nil {
@@ -229,9 +229,9 @@ func (i *Imperva) getAuditEvents() ([]AuditEvent, error) {
 		return e, err
 	}
 	for _, event := range er.Elements {
-		if event.Time > i.lastAuditEvent.UnixMilli() {
-			if event.Time > nle.UnixMilli() {
-				nle = time.UnixMilli(event.Time)
+		if i.lastAuditEvent.Compare("<", carbon.CreateFromTimestampMilli(event.Time)) {
+			if carbon.CreateFromTimestampMilli(event.Time).Compare(">", nle) {
+				nle = carbon.CreateFromTimestampMilli(event.Time)
 			}
 			e = append(e, event)
 		}
@@ -391,7 +391,7 @@ func New(id string, token string, accountId string, initInterval int) (*Imperva,
 		accountId:        accountId,
 		outputs:          append([]output.Output{}, output.NewStdout()),
 		lastInfraEvent:   time.Now().Add(time.Duration(-initInterval) * time.Minute),
-		lastAuditEvent:   time.Now().Add(time.Duration(-initInterval) * time.Minute),
+		lastAuditEvent:   carbon.Now().AddMinutes(-initInterval),
 		lastBillingEvent: carbon.Now().AddDays(-1),
 	}
 
