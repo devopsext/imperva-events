@@ -13,7 +13,7 @@ type Slack struct {
 
 func (s *Slack) Send(e *common.Event) ([]byte, error) {
 	return s.client.SendCustomMessage(vendors.SlackMessage{
-		Title:   "[" + e.Time.Format(time.RFC822) + "]" + e.Title,
+		Title:   "[" + e.Time.Format(time.RFC822) + "] " + e.Title,
 		Message: e.Body,
 		Channel: s.channel,
 	})
