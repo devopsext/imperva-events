@@ -281,7 +281,7 @@ func (i *Imperva) AddOutput(o output.Output) {
 func (ae *AuditEvent) toEvent() *common.Event {
 	return &common.Event{
 		Time:  time.UnixMilli(ae.Time),
-		Title: "Audit",
+		Title: "Imperva Audit Event",
 		Body:  ae.String(),
 	}
 }
@@ -289,7 +289,7 @@ func (ae *AuditEvent) toEvent() *common.Event {
 func (ie *InfraEvent) toEvent() *common.Event {
 	return &common.Event{
 		Time:  ie.GetTime(),
-		Title: "Infra",
+		Title: "Imperva Infrastructure Event",
 		Body:  ie.String(),
 	}
 }
